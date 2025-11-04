@@ -109,15 +109,12 @@ app.get("/api/foods/:id", (req, res) => {
   });
 });
 
-// ---------------- 섭취 기록 ----------------
-
-//  추가
-app.post("/api/records", (req, res) => {
+// ---------------- 섭취 기록 추가 ----------------
+app.post("/api/records/add", (req, res) => {
   const { user_id, food_id, quantity, record_date, meal_type } = req.body;
   if (!user_id || !food_id || !record_date || !meal_type)
     return res.status(400).json({ message: "필수 항목 누락" });
 
-  // 프론트에서 보내는 한국어 meal_type을 DB ENUM으로 변환
   const mealMap = {
     아침: "breakfast",
     점심: "lunch",
@@ -131,19 +128,14 @@ app.post("/api/records", (req, res) => {
     "INSERT INTO records (user_id, food_id, quantity, record_date, meal_type) VALUES (?, ?, ?, ?, ?)",
     [user_id, food_id, quantity || 1, record_date, dbMealType],
     (err, result) => {
-      if (err) {
-        console.error(err);
-        return res
-          .status(500)
-          .json({ message: "DB 입력 오류", error: err.message });
-      }
+      if (err) return res.status(500).json({ message: "DB 입력 오류" });
       res.json({ message: "추가 완료", id: result.insertId });
     }
   );
 });
 
-// 조회
-app.get("/api/records", (req, res) => {
+// ---------------- 섭취 기록 조회 ----------------
+app.get("/api/records/list", (req, res) => {
   const { user_id, record_date } = req.query;
   if (!user_id || !record_date)
     return res.status(400).json({ message: "user_id와 record_date 필요" });
@@ -156,7 +148,7 @@ app.get("/api/records", (req, res) => {
     [user_id, record_date],
     (err, results) => {
       if (err) return res.status(500).json({ message: err.message });
-      // DB ENUM을 다시 한국어로 매핑해서 반환
+
       const mealMapReverse = {
         breakfast: "아침",
         lunch: "점심",
@@ -172,17 +164,17 @@ app.get("/api/records", (req, res) => {
   );
 });
 
-// 삭제
-app.delete("/api/records/:id", (req, res) => {
+// ---------------- 섭취 기록 삭제 ----------------
+app.delete("/api/records/delete/:id", (req, res) => {
   const { id } = req.params;
-  db.query("DELETE FROM records WHERE id=?", [id], (err, result) => {
+  db.query("DELETE FROM records WHERE id=?", [id], (err) => {
     if (err) return res.status(500).json({ message: err.message });
     res.json({ message: "삭제 완료" });
   });
 });
 
 // ---------------- 일일 합산 ----------------
-app.get("/api/daily-summary", (req, res) => {
+app.get("/api/records/summary", (req, res) => {
   const { user_id, record_date } = req.query;
   if (!user_id || !record_date)
     return res.status(400).json({ message: "user_id와 record_date 필요" });
@@ -201,6 +193,42 @@ app.get("/api/daily-summary", (req, res) => {
       res.json(results[0]);
     }
   );
+});
+
+app.get("/api/weekly-summary", (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ message: "user_id 필요" });
+
+  const sql = `
+    SELECT 
+      DATE(record_date) AS date,
+      ROUND(SUM(f.energy_kcal * r.quantity), 2) AS total_kcal,
+      ROUND(SUM(f.carbohydrate_g * r.quantity), 2) AS total_carbohydrate,
+      ROUND(SUM(f.protein_g * r.quantity), 2) AS total_protein,
+      ROUND(SUM(f.fat_g * r.quantity), 2) AS total_fat,
+      ROUND(SUM(f.sugar_g * r.quantity), 2) AS total_sugar,
+      ROUND(SUM(f.sodium_mg * r.quantity), 2) AS total_sodium,
+      ROUND(SUM(f.calcium_mg * r.quantity), 2) AS total_calcium,
+      ROUND(SUM(f.iron_mg * r.quantity), 2) AS total_iron,
+      ROUND(SUM(f.potassium_mg * r.quantity), 2) AS total_potassium,
+      ROUND(SUM(f.vitamin_a_ug * r.quantity), 2) AS total_vitamin_a,
+      ROUND(SUM(f.vitamin_c_mg * r.quantity), 2) AS total_vitamin_c,
+      ROUND(SUM(f.vitamin_d_ug * r.quantity), 2) AS total_vitamin_d,
+      ROUND(SUM(f.cholesterol_mg * r.quantity), 2) AS total_cholesterol,
+      ROUND(SUM(f.saturated_fat_g * r.quantity), 2) AS total_saturated_fat,
+      ROUND(SUM(f.trans_fat_g * r.quantity), 2) AS total_trans_fat
+    FROM records r
+    JOIN foods f ON r.food_id = f.id
+    WHERE r.user_id = ?
+      AND record_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    GROUP BY DATE(record_date)
+    ORDER BY date ASC;
+  `;
+
+  db.query(sql, [user_id], (err, results) => {
+    if (err) return res.status(500).json({ message: err.message });
+    res.json(results);
+  });
 });
 
 app.listen(5000, () => console.log("Server running on http://localhost:5000"));

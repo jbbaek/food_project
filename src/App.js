@@ -6,6 +6,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import FoodDetail from "./pages/FoodDetail";
 import Mypage from "./pages/Mypage";
+import MyFoodChart from "./pages/MyFoodchart";
+import "./index.css";
 
 function App() {
   return (
@@ -17,6 +19,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/foods/:id" element={<FoodDetail />} />
         <Route path="/mypage" element={<Mypage />} />
+        <Route path="/myfoodchart" element={<MyFoodChart />} />
       </Routes>
     </BrowserRouter>
   );

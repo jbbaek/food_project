@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../css/Auth.css";
 
 function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -25,8 +24,8 @@ function Login() {
       setMessage(data.message);
 
       if (res.ok) {
-        const user = data.user; // 로그인 성공 시 반환된 사용자 정보
-        navigate("/mypage", { state: { user } }); // MyPage로 user 전달
+        const user = data.user;
+        navigate("/mypage", { state: { user } });
       }
     } catch (err) {
       console.error(err);
@@ -35,9 +34,12 @@ function Login() {
   };
 
   return (
-    <div className="auth-container">
-      <h2>로그인</h2>
-      <form onSubmit={handleSubmit}>
+    <div className="max-w-md mx-auto mt-12 p-6 border-2 border-yellow-400 rounded-xl bg-yellow-50 shadow-md">
+      <h2 className="text-center text-orange-500 text-2xl font-bold mb-6">
+        로그인
+      </h2>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="text"
           name="username"
@@ -45,6 +47,7 @@ function Login() {
           value={form.username}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="password"
@@ -53,10 +56,17 @@ function Login() {
           value={form.password}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
-        <button type="submit">로그인</button>
+        <button
+          type="submit"
+          className="p-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-400 transition duration-300"
+        >
+          로그인
+        </button>
       </form>
-      <p>{message}</p>
+
+      <p className="text-center mt-3 font-semibold text-gray-700">{message}</p>
     </div>
   );
 }

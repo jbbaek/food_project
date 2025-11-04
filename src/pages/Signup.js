@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../css/Auth.css";
 
 function Signup() {
   const [form, setForm] = useState({ username: "", password: "", name: "" });
   const [message, setMessage] = useState("");
-  const navigate = useNavigate(); // 로그인 페이지 이동용
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -24,7 +23,7 @@ function Signup() {
       setMessage(data.message);
 
       if (res.ok) {
-        // 회원가입 성공 시 1~2초 후 로그인 페이지로 이동
+        // 회원가입 성공 시 1초 후 로그인 페이지로 이동
         setTimeout(() => {
           navigate("/login");
         }, 1000);
@@ -36,9 +35,12 @@ function Signup() {
   };
 
   return (
-    <div className="auth-container">
-      <h2>회원가입</h2>
-      <form onSubmit={handleSubmit}>
+    <div className="max-w-md mx-auto mt-12 p-6 border-2 border-yellow-400 rounded-xl bg-yellow-50 shadow-md">
+      <h2 className="text-center text-orange-500 text-2xl font-bold mb-6">
+        회원가입
+      </h2>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="text"
           name="username"
@@ -46,6 +48,7 @@ function Signup() {
           value={form.username}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="password"
@@ -54,6 +57,7 @@ function Signup() {
           value={form.password}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="text"
@@ -62,10 +66,17 @@ function Signup() {
           value={form.name}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
-        <button type="submit">회원가입</button>
+        <button
+          type="submit"
+          className="p-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-400 transition duration-300"
+        >
+          회원가입
+        </button>
       </form>
-      <p>{message}</p>
+
+      <p className="text-center mt-3 font-semibold text-gray-700">{message}</p>
     </div>
   );
 }

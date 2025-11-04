@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import "../css/Navbar.css";
 
 function Navbar() {
   const [user, setUser] = useState(null);
@@ -8,60 +7,89 @@ function Navbar() {
   const location = useLocation();
 
   // 페이지 로드 및 경로 변경 시 로그인 상태 확인
-  const checkLogin = () => {
-    fetch("http://localhost:5000/api/me", {
-      method: "GET",
-      credentials: "include",
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("로그인 필요");
-        return res.json();
-      })
-      .then((data) => setUser(data))
-      .catch(() => setUser(null));
+  const checkLogin = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/me", {
+        method: "GET",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("로그인 필요");
+      const data = await res.json();
+      setUser(data);
+    } catch {
+      setUser(null);
+    }
   };
 
   useEffect(() => {
     checkLogin();
-  }, [location.pathname]); // 경로 바뀔 때도 상태 갱신
+  }, [location.pathname]);
 
-  const handleLogout = () => {
-    fetch("http://localhost:5000/api/logout", {
-      method: "POST",
-      credentials: "include",
-    })
-      .then(() => {
-        setUser(null); // 로그아웃 시 상태 초기화
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setUser(null);
         navigate("/login");
-      })
-      .catch((err) => console.error("로그아웃 오류:", err));
+      }
+    } catch (err) {
+      console.error("로그아웃 오류:", err);
+    }
   };
 
   return (
-    <nav className="navbar">
-      <ul className="navbar-links">
-        <li>
-          <Link to="/">Food</Link>
-        </li>
-        <li>
-          <Link to="/mypage">마이페이지</Link>
-        </li>
+    <nav className="bg-yellow-300 p-3 shadow-md">
+      <ul className="flex gap-4 items-center justify-between max-w-7xl mx-auto">
+        <div className="flex gap-4">
+          <li>
+            <Link
+              to="/"
+              className="font-bold text-orange-600 px-3 py-1 rounded hover:bg-orange-400 hover:text-white transition"
+            >
+              Food
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/mypage"
+              className="font-bold text-orange-600 px-3 py-1 rounded hover:bg-orange-400 hover:text-white transition"
+            >
+              마이페이지
+            </Link>
+          </li>
+        </div>
 
         {user ? (
           <li>
-            <button className="logout-button" onClick={handleLogout}>
+            <button
+              onClick={handleLogout}
+              className="font-bold text-orange-600 px-3 py-1 rounded hover:bg-orange-400 hover:text-white transition"
+            >
               로그아웃
             </button>
           </li>
         ) : (
-          <>
+          <div className="flex gap-4">
             <li>
-              <Link to="/login">로그인</Link>
+              <Link
+                to="/login"
+                className="font-bold text-orange-600 px-3 py-1 rounded hover:bg-orange-400 hover:text-white transition"
+              >
+                로그인
+              </Link>
             </li>
             <li>
-              <Link to="/signup">회원가입</Link>
+              <Link
+                to="/signup"
+                className="font-bold text-orange-600 px-3 py-1 rounded hover:bg-orange-400 hover:text-white transition"
+              >
+                회원가입
+              </Link>
             </li>
-          </>
+          </div>
         )}
       </ul>
     </nav>
