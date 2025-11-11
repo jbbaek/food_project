@@ -155,7 +155,6 @@ export default function MyFoodchart() {
                     border: "1px solid #FDBA74",
                     color: "#78350F",
                   }}
-                  formatter={(value) => [`${value} kcal`, "섭취량"]}
                 />
 
                 {/* 권장 섭취량 기준선 */}

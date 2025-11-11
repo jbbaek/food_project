@@ -54,9 +54,11 @@ function MyPage() {
       setNewRecord({ ...newRecord, food_id: "", food_name: "", calories: "" });
       return;
     }
+
     try {
       const res = await axios.get(`http://localhost:5000/api/foods/${foodId}`);
       const { food_name, energy_kcal } = res.data;
+
       setNewRecord({
         ...newRecord,
         food_id: foodId,
@@ -139,13 +141,13 @@ function MyPage() {
     간식: records.filter((r) => r.meal_type === "간식"),
   };
 
-  // ✅ 숫자를 소수점 2자리로 표시하는 헬퍼 함수
+  // 숫자를 소수점 2자리로 표시하는 헬퍼 함수
   const fmt = (v, unit = "") =>
     v !== undefined && !isNaN(v)
       ? `${Number(v).toFixed(2)}${unit}`
       : `0${unit}`;
 
-  // ✅ 표시할 영양소 리스트 (백엔드 필드명 기반)
+  //  표시할 영양소 리스트 (백엔드 필드명 기반)
   const nutrientList = [
     { key: "total_kcal", label: "총 섭취 칼로리", unit: " kcal" },
     { key: "total_carbs", label: "탄수화물", unit: " g" },
@@ -159,7 +161,7 @@ function MyPage() {
     );
 
   return (
-    <div className="p-8 max-w-5xl mx-auto bg-gradient-to-b from-[#fffef5] to-white text-gray-800 font-sans">
+    <div className="p-8 max-w-5xl mx-auto text-gray-800 font-sans">
       {/* Header */}
       <div className="mypage-header flex items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-bold text-orange-600">
@@ -185,7 +187,7 @@ function MyPage() {
         </div>
       </div>
 
-      {/* ✅ Summary (모든 영양소 + 소수점 2자리 표시) */}
+      {/* Summary (모든 영양소 + 소수점 2자리 표시) */}
       <div className="bg-white/80 shadow-md rounded-xl p-5 border border-gray-100 mb-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
           오늘의 영양 요약
