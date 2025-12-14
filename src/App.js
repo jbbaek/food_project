@@ -7,6 +7,7 @@ import Signup from "./pages/Signup";
 import FoodDetail from "./pages/FoodDetail";
 import Mypage from "./pages/Mypage";
 import MyFoodChart from "./pages/MyFoodchart";
+import RecipeDetail from "./pages/RecipeDetail";
 import "./index.css";
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Route path="/foods/:id" element={<FoodDetail />} />
         <Route path="/mypage" element={<Mypage />} />
         <Route path="/myfoodchart" element={<MyFoodChart />} />
+        <Route path="/recipes/seq/:seq" element={<RecipeDetail />} />
       </Routes>
     </BrowserRouter>
   );

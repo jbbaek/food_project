@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Mainpage() {
   const [query, setQuery] = useState("");
-  const [foods, setFoods] = useState([]); // 항상 배열 보장
+  const [foods, setFoods] = useState([]);
   const [showChat, setShowChat] = useState(false);
   const [message, setMessage] = useState("");
   const [chatLog, setChatLog] = useState([]);
@@ -11,11 +11,19 @@ function Mainpage() {
   const [loadingList, setLoadingList] = useState(false);
   const [loadingAuto, setLoadingAuto] = useState(false);
 
+  const [recipeCandidates, setRecipeCandidates] = useState([]);
+  const [showPickModal, setShowPickModal] = useState(false);
+
+  // ✅ 전송 중 중복 방지
+  const [sending, setSending] = useState(false);
+
   const navigate = useNavigate();
   const suggestionRef = useRef(null);
   const inputRef = useRef(null);
 
-  // 초성 목록
+  // ✅ 채팅 자동 스크롤
+  const chatBodyRef = useRef(null);
+
   const initials = [
     "ㄱ",
     "ㄴ",
@@ -33,32 +41,14 @@ function Mainpage() {
     "ㅎ",
   ];
 
-  // ✅ 초기 음식 리스트 로드 (API 구조 대응)
-  useEffect(() => {
-    fetchList();
-    const handleDocClick = (e) => {
-      if (
-        suggestionRef.current &&
-        !suggestionRef.current.contains(e.target) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target)
-      ) {
-        setSuggestions([]);
-      }
-    };
-    document.addEventListener("click", handleDocClick);
-    return () => document.removeEventListener("click", handleDocClick);
-  }, []);
-
   const safeSetFoods = (data) => {
-    // 응답 구조가 배열인지 확인
     if (Array.isArray(data)) setFoods(data);
     else if (data && Array.isArray(data.foods)) setFoods(data.foods);
     else if (data && Array.isArray(data.items)) setFoods(data.items);
-    else setFoods([]); // 예외 시 빈 배열
+    else setFoods([]);
   };
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     setLoadingList(true);
     try {
       const res = await fetch("http://localhost:5000/api/foods");
@@ -70,12 +60,30 @@ function Mainpage() {
     } finally {
       setLoadingList(false);
     }
-  };
+  }, []);
 
-  // 검색
+  useEffect(() => {
+    fetchList();
+
+    const handleDocClick = (e) => {
+      if (
+        suggestionRef.current &&
+        !suggestionRef.current.contains(e.target) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target)
+      ) {
+        setSuggestions([]);
+      }
+    };
+
+    document.addEventListener("click", handleDocClick);
+    return () => document.removeEventListener("click", handleDocClick);
+  }, [fetchList]);
+
   const handleSearch = async (e, q) => {
     if (e && e.preventDefault) e.preventDefault();
     const searchTerm = typeof q === "string" ? q : query;
+
     try {
       setLoadingList(true);
       const res = await fetch(
@@ -95,7 +103,6 @@ function Mainpage() {
     }
   };
 
-  // 자동완성
   useEffect(() => {
     if (!query.trim()) {
       setSuggestions([]);
@@ -126,7 +133,6 @@ function Mainpage() {
     return () => clearTimeout(tid);
   }, [query]);
 
-  // 초성별 검색
   const handleInitialSearch = async (ch) => {
     try {
       setLoadingList(true);
@@ -147,42 +153,124 @@ function Mainpage() {
     }
   };
 
-  const handleFoodClick = (id) => {
-    navigate(`/foods/${id}`);
+  const goRecipeByName = async (name) => {
+    const safeName = String(name || "").trim();
+    if (!safeName) return;
+
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/recipes/search?name=${encodeURIComponent(
+          safeName
+        )}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+
+      const list = Array.isArray(data.list) ? data.list : [];
+
+      if (list.length === 0) {
+        alert(`"${safeName}" 레시피가 식약처 DB에 없습니다.`);
+        return;
+      }
+
+      if (list.length === 1) {
+        navigate(`/recipes/seq/${encodeURIComponent(list[0].RCP_SEQ)}`);
+        return;
+      }
+
+      setRecipeCandidates(list);
+      setShowPickModal(true);
+    } catch (e) {
+      alert(`레시피 검색 실패: ${e.message}`);
+    }
   };
 
-  // AI 메뉴 추천
+  const handleFoodClick = (food) => {
+    const name = food?.food_name ?? food?.RCP_NM ?? food?.name;
+    goRecipeByName(name);
+  };
+
+  // ✅ 채팅 로그 변경되면 자동 스크롤
+  useEffect(() => {
+    if (!showChat) return;
+    const el = chatBodyRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chatLog, showChat]);
+
+  // ✅ AI 메뉴 추천
   const handleSendMessage = async () => {
     if (!message.trim()) return;
-    const userMsg = { sender: "user", text: message };
-    setChatLog((prev) => [...prev, userMsg]);
+    if (sending) return;
 
+    const userText = message;
+    setMessage("");
+
+    setChatLog((prev) => [
+      ...prev,
+      { sender: "user", type: "text", text: userText },
+    ]);
+
+    setSending(true);
     try {
       const res = await fetch("http://localhost:5000/api/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message: userText }),
       });
-      const data = await res.json();
 
-      const aiText =
-        data.reply ||
-        data.menu ||
-        (data.foods && Array.isArray(data.foods)
-          ? data.foods.map((f) => f.name || f.food_name).join(", ")
-          : "추천을 불러올 수 없습니다.");
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {}
 
-      const aiMsg = { sender: "ai", text: aiText };
-      setChatLog((prev) => [...prev, aiMsg]);
+      if (!res.ok)
+        throw new Error(data?.message || raw || `HTTP ${res.status}`);
+
+      const foodsFromApi =
+        (Array.isArray(data?.foods) && data.foods) ||
+        (Array.isArray(data?.cards) && data.cards) ||
+        [];
+
+      const replyFromApi =
+        (typeof data?.reply === "string" && data.reply) ||
+        (typeof data?.replyText === "string" && data.replyText) ||
+        "";
+
+      if (foodsFromApi.length > 0) {
+        setChatLog((prev) => [
+          ...prev,
+          { sender: "ai", type: "recommend", foods: foodsFromApi },
+        ]);
+      }
+
+      if (replyFromApi.trim()) {
+        setChatLog((prev) => [
+          ...prev,
+          { sender: "ai", type: "text", text: replyFromApi },
+        ]);
+      }
+
+      if (foodsFromApi.length === 0 && !replyFromApi.trim()) {
+        setChatLog((prev) => [
+          ...prev,
+          { sender: "ai", type: "text", text: "추천 결과가 없습니다." },
+        ]);
+      }
     } catch (err) {
       console.error("추천 요청 실패:", err);
       setChatLog((prev) => [
         ...prev,
-        { sender: "ai", text: "서버 오류가 발생했습니다." },
+        {
+          sender: "ai",
+          type: "text",
+          text: `서버 오류가 발생했습니다.\n(${err.message || "unknown"})`,
+        },
       ]);
+    } finally {
+      setSending(false);
     }
-
-    setMessage("");
   };
 
   const handleKeyDownChat = (e) => {
@@ -190,6 +278,11 @@ function Mainpage() {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const resetChat = () => {
+    setChatLog([]);
+    setMessage("");
   };
 
   return (
@@ -232,13 +325,13 @@ function Mainpage() {
               onChange={(e) => setQuery(e.target.value)}
               className="w-[100%] p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
             />
-            {/* 자동완성 박스 */}
+
             <div ref={suggestionRef} className="absolute left-0 right-0 z-20">
               {suggestions.length > 0 && (
                 <ul className="bg-white border border-gray-300 rounded-md mt-1 max-h-40 overflow-auto">
                   {suggestions.map((s, i) => (
                     <li
-                      key={i}
+                      key={`${s}-${i}`}
                       className="px-3 py-2 hover:bg-yellow-100 cursor-pointer text-sm"
                       onClick={() => {
                         setQuery(s);
@@ -252,6 +345,7 @@ function Mainpage() {
                 </ul>
               )}
             </div>
+
             {loadingAuto && (
               <div className="absolute right-2 top-2 text-xs text-gray-500">
                 검색 중...
@@ -281,10 +375,14 @@ function Mainpage() {
             ) : (
               foods.map((food) => (
                 <li
-                  key={food.id ?? food.ID ?? food.RCP_SEQ ?? food.food_name}
-                  onClick={() =>
-                    handleFoodClick(food.id ?? food.ID ?? food.RCP_SEQ)
+                  key={
+                    food.id ??
+                    food.food_name ??
+                    food.RCP_SEQ ??
+                    food.RCP_NM ??
+                    Math.random()
                   }
+                  onClick={() => handleFoodClick(food)}
                   className="px-4 py-3 border-b border-gray-200 text-gray-800 text-[15px] cursor-pointer hover:bg-yellow-100 transition duration-200 last:border-b-0"
                 >
                   {food.food_name ?? food.RCP_NM ?? food.name}
@@ -307,36 +405,115 @@ function Mainpage() {
       {/* 채팅창 */}
       {showChat && (
         <div className="fixed bottom-20 right-6 w-80 bg-white border border-gray-300 rounded-2xl shadow-lg p-4 z-50">
-          <h3 className="text-lg font-semibold text-orange-500 mb-2">
-            메뉴 추천 AI
-          </h3>
-          <div className="h-64 overflow-y-auto mb-3 border border-gray-200 rounded-lg p-2 bg-yellow-50 text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-orange-500">
+              메뉴 추천 AI
+            </h3>
+            <button
+              onClick={resetChat}
+              className="text-xs px-2 py-1 border rounded-md hover:bg-gray-50"
+              title="대화 초기화"
+            >
+              초기화
+            </button>
+          </div>
+
+          <div
+            ref={chatBodyRef}
+            className="h-64 overflow-y-auto mb-3 border border-gray-200 rounded-lg p-2 bg-yellow-50 text-sm whitespace-pre-wrap"
+          >
             {chatLog.length === 0 && (
               <div className="text-gray-500 text-sm">
                 원하는 말을 입력해보세요.
+                <br />
+                예: “얼큰한 국물”, “해장”, “느끼한 거”, “고단백”
               </div>
             )}
-            {chatLog.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`mb-2 ${
-                  msg.sender === "user"
-                    ? "text-right"
-                    : "text-left text-orange-700"
-                }`}
-              >
-                <span
-                  className={`inline-block px-3 py-1 rounded-lg ${
+
+            {chatLog.map((msg, idx) => {
+              if (msg.type === "recommend") {
+                return (
+                  <div
+                    key={`rec-${idx}`}
+                    className="mb-2 text-left text-orange-700"
+                  >
+                    {msg.foods.map((food, i) => {
+                      const name =
+                        food?.name ??
+                        food?.food_name ??
+                        food?.RCP_NM ??
+                        food?.title ??
+                        "";
+
+                      const seq = food?.RCP_SEQ ?? food?.rcp_seq ?? null;
+
+                      return (
+                        <div
+                          key={`${seq ?? name}-${i}`}
+                          className="mb-2 p-2 border border-orange-200 rounded-lg bg-white"
+                        >
+                          <div className="font-semibold text-sm mb-1">
+                            {i + 1}. {name || "이름 없음"}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              className="text-xs px-2 py-1 rounded-md border border-orange-300 text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                if (seq) {
+                                  navigate(
+                                    `/recipes/seq/${encodeURIComponent(seq)}`
+                                  );
+                                  return;
+                                }
+                                goRecipeByName(name);
+                              }}
+                            >
+                              레시피 보기
+                            </button>
+
+                            <button
+                              className="text-xs px-2 py-1 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                              onClick={() =>
+                                setMessage(
+                                  name ? `${name} 말고 다른 거` : "다른 거 추천"
+                                )
+                              }
+                              title="추가 요청 문구 자동 입력"
+                            >
+                              다른 추천
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={`msg-${idx}`}
+                  className={`mb-2 ${
                     msg.sender === "user"
-                      ? "bg-orange-500 text-white"
-                      : "bg-white border border-orange-300"
+                      ? "text-right"
+                      : "text-left text-orange-700"
                   }`}
                 >
-                  {msg.text}
-                </span>
-              </div>
-            ))}
+                  <span
+                    className={`inline-block px-3 py-1 rounded-lg ${
+                      msg.sender === "user"
+                        ? "bg-orange-500 text-white"
+                        : "bg-white border border-orange-300"
+                    }`}
+                  >
+                    {msg.text}
+                  </span>
+                </div>
+              );
+            })}
           </div>
+
           <div className="flex gap-2">
             <input
               type="text"
@@ -345,13 +522,67 @@ function Mainpage() {
               onKeyDown={handleKeyDownChat}
               placeholder="먹고 싶은 음식을 입력하세요"
               className="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none"
+              disabled={sending}
             />
             <button
               onClick={handleSendMessage}
-              className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-400 text-sm"
+              disabled={sending}
+              className={`px-3 py-1 rounded-lg text-sm ${
+                sending
+                  ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                  : "bg-orange-500 text-white hover:bg-orange-400"
+              }`}
             >
-              전송
+              {sending ? "전송중" : "전송"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 레시피 선택 모달 */}
+      {showPickModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[999]">
+          <div className="w-[420px] max-w-[90vw] bg-white rounded-2xl shadow-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-orange-600">
+                레시피 선택
+              </h3>
+              <button
+                className="text-sm px-2 py-1 border rounded-md"
+                onClick={() => {
+                  setShowPickModal(false);
+                  setRecipeCandidates([]);
+                }}
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="max-h-[420px] overflow-auto space-y-2">
+              {recipeCandidates.map((r) => (
+                <button
+                  key={r.RCP_SEQ}
+                  className="w-full text-left border rounded-xl p-3 hover:bg-orange-50"
+                  onClick={() => {
+                    setShowPickModal(false);
+                    setRecipeCandidates([]);
+                    navigate(`/recipes/seq/${encodeURIComponent(r.RCP_SEQ)}`);
+                  }}
+                >
+                  <div className="font-semibold">{r.RCP_NM}</div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {r.RCP_WAY2 ? `조리방법: ${r.RCP_WAY2}` : ""}
+                    {r.RCP_PAT2 ? ` · 종류: ${r.RCP_PAT2}` : ""}
+                    {r.INFO_ENG ? ` · ${r.INFO_ENG}kcal` : ""}
+                  </div>
+                  {r.HASH_TAG && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {r.HASH_TAG}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
