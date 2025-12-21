@@ -186,8 +186,9 @@ function Mainpage() {
   };
 
   const handleFoodClick = (food) => {
-    const name = food?.food_name ?? food?.RCP_NM ?? food?.name;
-    goRecipeByName(name);
+    const id = food?.id;
+    if (!id) return;
+    navigate(`/foods/${id}`); // 너 라우터에 FoodDetail 연결돼 있어야 함
   };
 
   // ✅ 채팅 로그 변경되면 자동 스크롤
@@ -233,10 +234,14 @@ function Mainpage() {
         (Array.isArray(data?.cards) && data.cards) ||
         [];
 
-      const replyFromApi =
+      let replyFromApi =
         (typeof data?.reply === "string" && data.reply) ||
         (typeof data?.replyText === "string" && data.replyText) ||
         "";
+
+      // ✅ "요청: ..." 줄 제거 (첫 줄만 잘라냄)
+      replyFromApi = String(replyFromApi || "");
+      replyFromApi = replyFromApi.replace(/^요청\s*:\s*.*(\r?\n)?/i, "");
 
       if (foodsFromApi.length > 0) {
         setChatLog((prev) => [
@@ -470,18 +475,6 @@ function Mainpage() {
                               }}
                             >
                               레시피 보기
-                            </button>
-
-                            <button
-                              className="text-xs px-2 py-1 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
-                              onClick={() =>
-                                setMessage(
-                                  name ? `${name} 말고 다른 거` : "다른 거 추천"
-                                )
-                              }
-                              title="추가 요청 문구 자동 입력"
-                            >
-                              다른 추천
                             </button>
                           </div>
                         </div>
